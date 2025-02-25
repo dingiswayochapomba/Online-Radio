@@ -8,4 +8,30 @@ body {
 
 .container {
   @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+@layer components {
+  .container {
+    @apply px-4 mx-auto max-w-7xl;
+  }
+  
+  .station-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6;
+  }
+  
+  .station-card {
+    @apply bg-gray-800 rounded-xl shadow-lg p-4 sm:p-6 cursor-pointer transition-all duration-300 border;
+  }
+  
+  .player-section {
+    @apply flex flex-col md:flex-row gap-4 md:gap-8 items-center;
+  }
+  
+  .player-artwork {
+    @apply w-32 h-32 md:w-48 md:h-48 relative;
+  }
+  
+  .volume-control {
+    @apply flex items-center gap-2 md:gap-3 flex-1;
+  }
 } 

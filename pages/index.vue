@@ -1,34 +1,26 @@
 <template>
   <div class="min-h-screen bg-gray-900">
-    <!-- Header -->
-    <header class="bg-gray-800 shadow-lg border-b border-gray-700 p-4">
-      <div class="container mx-auto flex justify-between items-center">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 bg-[#F6B17A] rounded-lg flex items-center justify-center">
-            <span class="text-xl">🎵</span>
-          </div>
-          <h1 class="text-2xl font-bold bg-gradient-to-r from-[#F6B17A] to-orange-500 text-transparent bg-clip-text">
-            TuneRadio
-          </h1>
-        </div>
-        <div class="flex items-center gap-6">
-          <span class="text-sm text-gray-400 flex items-center gap-2">
-            <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-            {{ totalListeners }} listening
-          </span>
-          <button @click="toggleTheme" class="p-2 rounded-full hover:bg-gray-700 text-gray-400 hover:text-gray-200 transition-colors">
-            <span v-if="theme === 'dark'">🌞</span>
-            <span v-else>🌙</span>
-          </button>
+
+    <!--Advert Banner-->
+    <div class="container mx-auto py-4">
+      <div class="w-[728px] h-[90px] mx-auto bg-gray-800 rounded-lg overflow-hidden border border-gray-700 relative group">
+        <img 
+          src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=728&h=90&fit=crop"
+          alt="Advertisement"
+          class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+        >
+        <div class="absolute top-1 right-1 bg-gray-900/60 text-xs text-gray-400 px-2 py-0.5 rounded">
+          Advertisement
         </div>
       </div>
-    </header>
+    </div>
+    <!--Advert Banner-->
 
     <!-- Now Playing Section -->
     <div class="container mx-auto mt-8 p-4">
       <div class="bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-700">
-        <div class="flex flex-col md:flex-row gap-8 items-center">
-          <div class="w-48 h-48 relative group">
+        <div class="player-section">
+          <div class="player-artwork group">
             <img 
               :src="currentTrack.artwork"
               :alt="currentTrack.title"
@@ -39,9 +31,9 @@
               {{ isPlaying ? 'Live' : 'Ready' }}
             </div>
           </div>
-          <div class="flex-1 space-y-4">
+          <div class="flex-1 space-y-4 w-full text-center md:text-left">
             <div>
-              <h2 class="text-2xl font-bold text-white mb-2">
+              <h2 class="text-xl md:text-2xl font-bold text-white mb-2">
                 {{ currentTrack.title }}
               </h2>
               <p class="text-gray-400">
@@ -52,14 +44,14 @@
               <div class="flex items-center gap-4">
                 <button 
                   @click="handlePlayPause" 
-                  class="w-12 h-12 rounded-full bg-[#F6B17A] flex items-center justify-center hover:bg-[#e5a06b] transition-colors"
+                  class="w-12 h-12 rounded-full bg-[#F6B17A] flex items-center justify-center hover:bg-[#e5a06b] transition-colors text-gray-900"
                 >
-                  <span class="text-xl text-gray-900">
+                  <span class="text-xl">
                     {{ isPlaying ? '⏸️' : '▶️' }}
                   </span>
                 </button>
                 
-                <div class="flex items-center gap-3 flex-1">
+                <div class="volume-control">
                   <button 
                     @click="toggleMute" 
                     class="text-gray-400 hover:text-[#F6B17A] transition-colors"
@@ -73,14 +65,14 @@
                     min="0" 
                     max="1" 
                     step="0.01"
-                    class="flex-1 h-2 rounded-lg appearance-none cursor-pointer bg-gray-700"
+                    class="flex-1 h-2 rounded-lg appearance-none cursor-pointer bg-gray-700 volume-slider"
                     @input="updateVolume"
                   >
                 </div>
               </div>
             </div>
 
-            <div class="flex items-center gap-4 text-sm text-gray-500">
+            <div class="flex items-center justify-center md:justify-start gap-4 text-sm text-gray-500">
               <span class="flex items-center gap-1">
                 <span class="w-1 h-1 bg-[#F6B17A] rounded-full"></span>
                 {{ currentTrack.bitrate }}kbps
@@ -100,7 +92,7 @@
       <div class="flex justify-between items-center mb-6">
         <h2 class="text-xl font-semibold text-white flex items-center gap-2">
           <span class="w-2 h-2 bg-[#F6B17A] rounded-full"></span>
-          Malawi Radio Stations
+          {{ currentStationId ? currentTrack.category || 'Now Playing' : 'Featured Stations' }}
         </h2>
         <button 
           @click="fetchStations" 
@@ -140,12 +132,12 @@
       </div>
 
       <!-- Stations Grid -->
-      <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div class="station-grid">
         <div 
           v-for="station in stations" 
           :key="station.id" 
           :class="[
-            'bg-gray-800 rounded-xl shadow-lg p-6 cursor-pointer transition-all duration-300 border',
+            'station-card',
             currentStationId === station.id 
               ? 'border-[#F6B17A]' 
               : 'border-gray-700 hover:border-[#F6B17A]',
@@ -153,8 +145,8 @@
           ]"
           @click="selectStation(station)"
         >
-          <div class="flex items-center gap-4 mb-4">
-            <div class="w-14 h-14 rounded-xl overflow-hidden group-hover:scale-105 transition-transform duration-300">
+          <div class="flex items-center gap-3 sm:gap-4 mb-4">
+            <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden group-hover:scale-105 transition-transform duration-300">
               <img 
                 :src="station.logo" 
                 :alt="station.name"
@@ -162,11 +154,11 @@
                 @error="e => e.target.src = placeholderImage"
               >
             </div>
-            <div>
-              <h3 class="font-semibold text-white group-hover:text-[#F6B17A] transition-colors">
+            <div class="flex-1 min-w-0">
+              <h3 class="font-semibold text-white group-hover:text-[#F6B17A] transition-colors truncate">
                 {{ station.name }}
               </h3>
-              <p class="text-sm text-gray-400">
+              <p class="text-sm text-gray-400 truncate">
                 {{ station.genre }} • {{ station.country }}
               </p>
             </div>
@@ -218,7 +210,8 @@ const currentTrack = ref({
   bitrate: '128',
   format: 'MP3',
   streamUrl: '',
-  mimeType: 'audio/mpeg'
+  mimeType: 'audio/mpeg',
+  category: 'Featured Stations'
 });
 
 const fetchStations = async () => {
@@ -279,14 +272,12 @@ const selectStation = async (station) => {
     isLoading.value = true;
     error.value = null;
     
-    // Stop current stream if exists
     if (audioStream.value) {
       audioStream.value.pause();
       audioStream.value.src = '';
       audioStream.value = null;
     }
     
-    // Update current station and track info first
     currentStationId.value = station.id;
     currentTrack.value = {
       title: station.name,
@@ -295,57 +286,51 @@ const selectStation = async (station) => {
       bitrate: station.bitrate,
       format: station.codec,
       streamUrl: station.streamUrl,
-      mimeType: 'audio/mpeg'
+      mimeType: 'audio/mpeg',
+      category: station.genre || 'Radio Station'
     };
 
-    // Create new Audio object with error handling
     audioStream.value = new Audio(station.streamUrl);
     audioStream.value.crossOrigin = 'anonymous';
     audioStream.value.volume = volume.value;
     
-    // Add event listeners
-    audioStream.value.addEventListener('playing', () => {
+    // Add timeout for slow connections
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Connection timeout')), 10000);
+    });
+
+    // Try to play with timeout
+    try {
+      await Promise.race([
+        audioStream.value.play(),
+        timeoutPromise
+      ]);
+      
       isPlaying.value = true;
       updateListenerCount(1);
       error.value = null;
-    });
-    
-    audioStream.value.addEventListener('pause', () => {
-      isPlaying.value = false;
-      updateListenerCount(-1);
-    });
-    
-    audioStream.value.addEventListener('ended', () => {
-      isPlaying.value = false;
-      error.value = 'Stream ended. Click play to retry.';
-    });
-    
-    audioStream.value.addEventListener('error', (e) => {
-      console.error('Audio stream error:', e);
-      error.value = `Stream error: ${getAudioErrorMessage(e)}`;
-      isPlaying.value = false;
-    });
 
-    // Start playing
-    try {
-      await audioStream.value.play();
-      
-      // Log station click only if playback starts successfully
+      // Log station click
       await fetch(`https://de1.api.radio-browser.info/json/url/${station.id}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
+        headers: { 'Content-Type': 'application/json' }
       });
+
     } catch (playError) {
-      console.error('Playback failed:', playError);
-      error.value = 'Failed to play this station. Please try another one.';
+      if (playError.message === 'Connection timeout') {
+        error.value = 'Station is taking too long to respond. Please try another station.';
+      } else {
+        error.value = 'Unable to play this station. It may be temporarily offline.';
+      }
+      isPlaying.value = false;
       throw playError;
     }
 
   } catch (error) {
     console.error('Error playing station:', error);
-    error.value = 'Failed to play this station. Please try another one.';
+    if (!error.value) { // Only set if not already set
+      error.value = 'This station is currently unavailable. Please try another one.';
+    }
   } finally {
     isLoading.value = false;
   }
@@ -402,6 +387,12 @@ const updateVolume = () => {
   if (audioStream.value) {
     audioStream.value.volume = volume.value;
     isMuted.value = volume.value === 0;
+    
+    // Update slider background gradient
+    const slider = document.querySelector('.volume-slider');
+    if (slider) {
+      slider.style.setProperty('--volume-percentage', `${volume.value * 100}%`);
+    }
   }
 };
 
@@ -435,6 +426,7 @@ const getAudioErrorMessage = (error) => {
 // Fetch stations on component mount
 onMounted(() => {
   fetchStations();
+  updateVolume(); // Set initial volume slider gradient
 });
 
 // Add cleanup on component unmount
@@ -513,6 +505,45 @@ input[type="range"]::-moz-range-thumb {
 
 input[type="range"]::-moz-range-thumb:hover {
   transform: scale(1.1);
+  background: #e5a06b;
+}
+
+/* Update volume slider styling */
+.volume-slider {
+  background: linear-gradient(to right, #F6B17A 0%, #F6B17A var(--volume-percentage), #374151 var(--volume-percentage), #374151 100%);
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #F6B17A;
+  border: 2px solid #1F2937;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.volume-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  background: #e5a06b;
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #F6B17A;
+  border: 2px solid #1F2937;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.volume-slider::-moz-range-thumb:hover {
+  transform: scale(1.2);
   background: #e5a06b;
 }
 </style> 

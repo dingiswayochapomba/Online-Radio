@@ -1,5 +1,16 @@
 <template>
   <div class="min-h-screen bg-gray-900">
+    <!-- Add this button at the top of your player section -->
+    <div v-if="!isPlaying" class="container mx-auto mt-8 p-4 text-center">
+      <button 
+        @click="autoPlayZodiak"
+        class="px-6 py-3 bg-[#F6B17A] rounded-full text-gray-900 font-semibold hover:bg-[#e5a06b] transition-colors"
+        :disabled="isPlaybackLoading"
+      >
+        {{ isPlaybackLoading ? 'Loading...' : 'Play Zodiak Radio' }}
+      </button>
+    </div>
+
     <!-- Now Playing Section -->
     <div ref="playerSection" class="container mx-auto mt-8 p-4">
       <div class="bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-700">
@@ -222,12 +233,12 @@ const placeholderImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB
 
 // Initialize current track data
 const currentTrack = ref({
-  title: 'Welcome to Gospel Radio',
-  artist: 'Select a station to start listening',
-  artwork: placeholderImage,
+  title: 'Zodiak Broadcasting Station',
+  artist: 'Malawi',
+  artwork: 'https://zodiak.mw/images/logo.png', // Using a placeholder logo URL
   bitrate: '128',
   format: 'MP3',
-  streamUrl: '',
+  streamUrl: 'https://ice31.securenetsystems.net/ZODIAKB', // Zodiak's stream URL
   mimeType: 'audio/mpeg'
 })
 
@@ -266,23 +277,90 @@ interface Station {
 
 const CORS_PROXY = 'https://api.allorigins.win/raw?url='
 
+// Add Malawian radio stations data
+const malawiStations: Station[] = [
+  {
+    id: 'timveni',
+    name: 'Timveni Radio',
+    genre: 'Youth Radio',
+    logo: 'https://timveni.com/wp-content/uploads/2019/03/timveni-logo.png', // Replace with actual logo
+    listeners: 0,
+    bitrate: 128,
+    streamUrl: 'https://stream.zeno.fm/q8wd4yxm7k0uv', // Timveni stream URL
+    country: 'Malawi',
+    codec: 'MP3',
+    status: 'Online'
+  },
+  {
+    id: 'mij',
+    name: 'MIJ FM',
+    genre: 'News & Entertainment',
+    logo: 'https://mijfm.com/wp-content/uploads/2020/01/mij-fm-logo.png', // Replace with actual logo
+    listeners: 0,
+    bitrate: 128,
+    streamUrl: 'https://stream.zeno.fm/6vw2gc5g0uhvv', // MIJ FM stream URL
+    country: 'Malawi',
+    codec: 'MP3',
+    status: 'Online'
+  },
+  {
+    id: 'times',
+    name: 'Times Radio',
+    genre: 'News & Entertainment',
+    logo: 'https://times.mw/wp-content/uploads/2020/01/times-radio-logo.png', // Replace with actual logo
+    listeners: 0,
+    bitrate: 128,
+    streamUrl: 'https://stream.zeno.fm/hgvk475g0uhvv', // Times Radio stream URL
+    country: 'Malawi',
+    codec: 'MP3',
+    status: 'Online'
+  },
+  {
+    id: 'zodiak',
+    name: 'Zodiak Broadcasting',
+    genre: 'News & Entertainment',
+    logo: 'https://zodiak.mw/images/logo.png',
+    listeners: 0,
+    bitrate: 128,
+    streamUrl: 'https://ice31.securenetsystems.net/ZODIAKB',
+    country: 'Malawi',
+    codec: 'MP3',
+    status: 'Online'
+  },
+  {
+    id: 'chanco',
+    name: 'CHANCO Radio',
+    genre: 'University Radio',
+    logo: placeholderImage,
+    listeners: 0,
+    bitrate: 128,
+    streamUrl: 'https://stream.zeno.fm/nktz0gg7quhvv', // CHANCO Radio stream URL
+    country: 'Malawi',
+    codec: 'MP3',
+    status: 'Online'
+  }
+]
+
+// Modify the fetchStations function to include Malawian stations
 const fetchStations = async () => {
   try {
     error.value = null
     isLoading.value = true
     
-    // Fetch stations from multiple countries
-    const countries = ['us', 'gb', 'ca', 'au', 'fr', 'de', 'it', 'es', 'br', 'jp']
+    // First, add Malawian stations
+    stations.value = [...malawiStations]
+    
+    // Then fetch additional stations from the API
+    const countries = ['za', 'ke', 'tz', 'ug', 'zm'] // Focusing on African stations
     const randomCountry = countries[Math.floor(Math.random() * countries.length)]
     
     const response = await fetch(CORS_PROXY + encodeURIComponent(`https://onlineradiobox.com/json/${randomCountry}/`))
     
     if (!response.ok) {
-      throw new Error('Failed to fetch radio stations')
+      throw new Error('Failed to fetch additional radio stations')
     }
 
     const data = await response.json()
-    console.log('API Response:', data)
     
     if (!data || typeof data !== 'object') {
       throw new Error('Invalid response format from API')
@@ -294,55 +372,75 @@ const fetchStations = async () => {
       throw new Error('No stations array found in response')
     }
     
-    // Filter out stations without valid URLs
-    const validStations = stationsData.filter((station: any) => {
-      return station && (
-        (station.stream && station.stream.trim() !== '') ||
-        (station.url && station.url.trim() !== '')
-      )
-    })
-    
-    if (!validStations.length) {
-      throw new Error('No active stations found')
-    }
-    
-    // Randomize and limit to 15 stations
-    const randomizedStations = validStations
-      .sort(() => Math.random() - 0.5)
-      .slice(0, 15)
-    
-    // Update total stations count
-    totalStations.value = 15
-    
-    // Map stations to our format
-    stations.value = randomizedStations.map((station: any): Station => ({
-      id: station.id || station.uid || String(Math.random()),
-      name: station.name || station.title || 'Unknown Station',
-      genre: Array.isArray(station.genres) 
-        ? station.genres.join(', ') 
-        : station.genre || 'Various',
-      logo: station.logo || station.image || station.favicon || placeholderImage,
-      listeners: station.listeners || station.plays || 0,
-      bitrate: parseInt(station.bitrate) || 128,
-      streamUrl: station.stream || station.url || '',
-      country: station.country || station.region || 'Unknown',
-      codec: station.codec || station.format || 'MP3',
-      status: station.status || 'Online'
-    }))
+    // Filter and map additional stations
+    const additionalStations = stationsData
+      .filter((station: any) => station && station.stream && station.stream.trim() !== '')
+      .map((station: any): Station => ({
+        id: station.id || String(Math.random()),
+        name: station.name || 'Unknown Station',
+        genre: Array.isArray(station.genres) ? station.genres.join(', ') : station.genre || 'Various',
+        logo: station.logo || station.favicon || placeholderImage,
+        listeners: station.listeners || 0,
+        bitrate: parseInt(station.bitrate) || 128,
+        streamUrl: station.stream || '',
+        country: station.country || 'Unknown',
+        codec: station.codec || 'MP3',
+        status: station.status || 'Online'
+      }))
+      .slice(0, 10) // Limit to 10 additional stations
 
-    // Apply pagination (5 stations per page)
-    const start = (currentPage.value - 1) * 5
-    const end = start + 5
+    // Combine Malawian and additional stations
+    stations.value = [...stations.value, ...additionalStations]
+    totalStations.value = stations.value.length
+
+    // Apply pagination
+    const start = (currentPage.value - 1) * stationsPerPage
+    const end = start + stationsPerPage
     stations.value = stations.value.slice(start, end)
 
   } catch (err: any) {
     console.error('Error fetching stations:', err)
     error.value = err.message || 'Failed to load radio stations'
+    // Still show Malawian stations even if API fails
+    stations.value = malawiStations
+    totalStations.value = malawiStations.length
   } finally {
     isLoading.value = false
   }
 }
 
+// Add a function to try alternative stream URLs if the main one fails
+const tryAlternativeStream = async (station: Station) => {
+  // Alternative stream URLs for Malawian stations
+  const alternativeStreams: Record<string, string[]> = {
+    'timveni': [
+      'https://stream.zeno.fm/q8wd4yxm7k0uv',
+      'https://stream.radiojar.com/timveni'
+    ],
+    'mij': [
+      'https://stream.zeno.fm/6vw2gc5g0uhvv',
+      'https://stream.radiojar.com/mijfm'
+    ],
+    // Add alternative URLs for other stations...
+  }
+
+  const streams = alternativeStreams[station.id] || []
+  
+  for (const streamUrl of streams) {
+    try {
+      const audio = new Audio(streamUrl)
+      await audio.play()
+      audio.pause()
+      return streamUrl
+    } catch (err) {
+      console.warn(`Failed to play stream: ${streamUrl}`, err)
+    }
+  }
+  
+  return station.streamUrl // Return original if no alternatives work
+}
+
+// Modify selectStation to use tryAlternativeStream
 const selectStation = async (station: Station) => {
   try {
     isPlaybackLoading.value = true
@@ -353,6 +451,9 @@ const selectStation = async (station: Station) => {
       audioStream.value.src = ''
       audioStream.value = null
     }
+
+    // Try to get working stream URL
+    const streamUrl = await tryAlternativeStream(station)
     
     currentStationId.value = station.id
     currentTrack.value = {
@@ -361,11 +462,11 @@ const selectStation = async (station: Station) => {
       artwork: station.logo || placeholderImage,
       bitrate: station.bitrate.toString(),
       format: station.codec,
-      streamUrl: station.streamUrl,
+      streamUrl: streamUrl,
       mimeType: 'audio/mpeg'
     }
 
-    const audio = new Audio(station.streamUrl)
+    const audio = new Audio(streamUrl)
     audio.crossOrigin = 'anonymous'
     audio.volume = volume.value
     audioStream.value = audio
@@ -486,9 +587,58 @@ const handleImageError = (e: Event) => {
   }
 }
 
-// Fetch stations on component mount
+// Add autoplay function
+const autoPlayZodiak = async () => {
+  try {
+    isPlaybackLoading.value = true
+    error.value = null
+    
+    if (audioStream.value) {
+      audioStream.value.pause()
+      audioStream.value.src = ''
+      audioStream.value = null
+    }
+
+    const audio = new Audio(currentTrack.value.streamUrl)
+    audio.crossOrigin = 'anonymous'
+    audio.volume = volume.value
+    audioStream.value = audio
+    
+    audio.addEventListener('playing', () => {
+      isPlaying.value = true
+      error.value = null
+      isPlaybackLoading.value = false
+    })
+    
+    audio.addEventListener('pause', () => {
+      isPlaying.value = false
+    })
+    
+    audio.addEventListener('ended', () => {
+      isPlaying.value = false
+      error.value = 'Stream ended. Click play to retry.'
+    })
+    
+    audio.addEventListener('error', (e) => {
+      console.error('Audio stream error:', e)
+      error.value = 'Stream error: Failed to play Zodiak radio'
+      isPlaying.value = false
+      isPlaybackLoading.value = false
+    })
+
+    await audio.play()
+
+  } catch (err: any) {
+    console.error('Error playing Zodiak:', err)
+    error.value = 'Failed to play Zodiak radio. Please try again.'
+    isPlaybackLoading.value = false
+  }
+}
+
+// Update onMounted to autoplay Zodiak
 onMounted(() => {
   fetchStations()
+  autoPlayZodiak() // Auto play Zodiak when component mounts
 })
 
 // Cleanup on component unmount
