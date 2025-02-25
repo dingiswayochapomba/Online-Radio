@@ -11,8 +11,11 @@
   },
   "dependencies": {
     "@heroicons/vue": "^2.2.0",
+    "@nuxtjs/composition-api": "^0.34.0",
+    "@pinia/nuxt": "^0.4.11",
     "@unhead/vue": "^1.8.8",
     "nuxt": "^3.8.0",
+    "pinia": "^2.1.7",
     "vue": "^3.3.4",
     "vue-router": "^4.2.4"
   },

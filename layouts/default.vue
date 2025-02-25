@@ -2,9 +2,13 @@
   <div class="min-h-screen bg-gray-900">
     <TheNavigation />
     <slot />
+    <AudioPlayer />
   </div>
 </template>
 
-<script setup>
-// The Navigation component will be auto-imported if you have auto-imports configured
+<script setup lang="ts">
+import { createAudioState } from '~/composables/useAudioState'
+
+// Initialize audio state
+createAudioState()
 </script> 
