@@ -44,5 +44,8 @@ export default defineNuxtConfig({
 
   build: {
     transpile: ['@heroicons/vue']
+  },
+  nitro: {
+    preset: 'cloudflare-pages',
   }
 })

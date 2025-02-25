@@ -54,12 +54,12 @@ export function createAudioState() {
   })
 
   const previousVolume = ref(1)
+  let loadTimeout: ReturnType<typeof setTimeout> | null = null
 
   const actions: AudioActions = {
     async handlePlayPause() {
       try {
         if (!state.audioStream && state.currentTrack.streamUrl) {
-          // If no audio stream exists but we have a URL, create new stream
           await actions.initializeAudio(state.currentTrack.streamUrl)
           return
         }
@@ -76,10 +76,11 @@ export function createAudioState() {
       } catch (error) {
         console.error('Playback error:', error)
         state.isPlaying = false
+        throw error
       }
     },
 
-    updateVolume(value: number) {
+    updateVolume(value = 1) {
       state.volume = value
       if (state.audioStream) {
         state.audioStream.volume = value
@@ -103,48 +104,65 @@ export function createAudioState() {
 
     setTrack(track: Track) {
       state.currentTrack = track
-      // Stop current audio when changing tracks
       actions.stopAudio()
     },
 
     async initializeAudio(url: string) {
       try {
-        // Stop any existing audio
+        // Clear any existing timeout and audio
+        if (loadTimeout) clearTimeout(loadTimeout)
         actions.stopAudio()
 
-        // Create new audio instance
+        // Create new audio instance with optimized settings
         const audio = new Audio()
         audio.crossOrigin = 'anonymous'
         audio.volume = state.volume
+        audio.preload = 'auto'
         
-        // Set up event listeners
-        audio.addEventListener('playing', () => {
-          state.isPlaying = true
-        })
+        // Reduce buffering to start playback faster
+        audio.autobuffer = true
+        audio.autoplay = true // Try immediate autoplay
         
-        audio.addEventListener('pause', () => {
-          state.isPlaying = false
-        })
-        
-        audio.addEventListener('ended', () => {
-          state.isPlaying = false
+        const playPromise = new Promise((resolve, reject) => {
+          // Shorter timeout (3 seconds)
+          loadTimeout = setTimeout(() => {
+            reject(new Error('Stream loading timeout'))
+          }, 3000)
+
+          const cleanup = () => {
+            if (loadTimeout) {
+              clearTimeout(loadTimeout)
+              loadTimeout = null
+            }
+          }
+
+          // Try to play as soon as we have enough data
+          audio.addEventListener('canplay', async () => {
+            try {
+              cleanup()
+              await audio.play()
+              state.isPlaying = true
+              resolve(true)
+            } catch (err) {
+              cleanup()
+              reject(err)
+            }
+          }, { once: true })
+
+          audio.addEventListener('error', (e) => {
+            cleanup()
+            state.isPlaying = false
+            reject(new Error('Failed to play audio'))
+          }, { once: true })
         })
 
-        audio.addEventListener('error', (e) => {
-          console.error('Audio error:', e)
-          state.isPlaying = false
-          throw new Error('Failed to play audio')
-        })
-
-        // Set source and load audio
+        // Set source and immediately try to load
         audio.src = url
-        await audio.load()
-        
-        // Store the audio stream
         state.audioStream = audio
-        
-        // Try to play
-        await audio.play()
+        audio.load() // Force immediate loading
+
+        // Wait for either play success or failure
+        await playPromise
       } catch (error) {
         console.error('Error initializing audio:', error)
         state.isPlaying = false
@@ -153,6 +171,11 @@ export function createAudioState() {
     },
 
     stopAudio() {
+      if (loadTimeout) {
+        clearTimeout(loadTimeout)
+        loadTimeout = null
+      }
+      
       if (state.audioStream) {
         state.audioStream.pause()
         state.audioStream.src = ''
@@ -161,6 +184,13 @@ export function createAudioState() {
         state.isPlaying = false
       }
     }
+  }
+
+  // Clean up on window unload
+  if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', () => {
+      actions.stopAudio()
+    })
   }
 
   provide(AudioKey, { state, actions })

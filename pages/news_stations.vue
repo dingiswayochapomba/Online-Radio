@@ -260,14 +260,15 @@ const fetchStations = async () => {
     error.value = null;
     isLoading.value = true;
     
+    // Request more stations than needed to account for filtering
     const response = await fetch('https://de1.api.radio-browser.info/json/stations/search?' + new URLSearchParams({
       tag: 'news',
       language: 'en',
       hidebroken: 'true',
-      order: 'clickcount',  // Sort by popularity (click count)
-      reverse: 'true',      // Reverse order to get most popular first
-      offset: ((currentPage.value - 1) * stationsPerPage).toString(),
-      limit: stationsPerPage.toString()
+      order: 'clickcount',
+      reverse: 'true',
+      offset: '0',  // Get all stations first, then we'll handle pagination client-side
+      limit: '100'  // Request more stations to ensure we have enough after filtering
     }));
 
     if (!response.ok) {
@@ -276,25 +277,39 @@ const fetchStations = async () => {
 
     const data = await response.json();
     
-    // Filter stations to ensure they have valid streams
+    // More strict filtering for working stations
     const validStations = data.filter(station => 
       station.url_resolved &&
       station.url_resolved.trim() !== '' &&
-      station.lastcheckok === 1
+      station.lastcheckok === 1 &&
+      station.clickcount > 0 && // Must have some listeners
+      station.bitrate >= 64 && // Reasonable quality
+      !station.url_resolved.includes('undefined') &&
+      !station.url_resolved.includes('null') &&
+      // Common working stream formats
+      (station.codec?.toLowerCase().includes('mp3') ||
+       station.codec?.toLowerCase().includes('aac') ||
+       station.url_resolved.toLowerCase().includes('.mp3') ||
+       station.url_resolved.toLowerCase().includes('.aac'))
     );
     
     if (!validStations.length) {
       throw new Error('No active news stations found');
     }
+
+    // Take only the first 60 valid stations
+    const limitedStations = validStations.slice(0, 60);
+    totalStations.value = limitedStations.length;
     
-    // Update total stations count
-    totalStations.value = 30;
+    // Calculate pagination slice
+    const start = (currentPage.value - 1) * stationsPerPage;
+    const end = start + stationsPerPage;
     
-    // Map stations
-    stations.value = validStations.map(station => ({
+    // Map only the stations for current page
+    stations.value = limitedStations.slice(start, end).map(station => ({
       id: station.stationuuid,
       name: station.name,
-      genre: 'News',  // Override genre to always show News
+      genre: 'News',
       logo: station.favicon || placeholderImage,
       listeners: station.clickcount || 0,
       bitrate: station.bitrate || 128,
@@ -304,8 +319,9 @@ const fetchStations = async () => {
       country: station.country || 'Unknown',
       votes: station.votes,
       lastChecked: new Date(station.lastchecktime).toLocaleDateString(),
-      status: station.lastcheckok === 1 ? 'Online' : 'Offline'
+      status: 'Online'
     }));
+
   } catch (error) {
     console.error('Error fetching stations:', error);
     error.value = error.message || 'Failed to load news stations';
@@ -336,11 +352,27 @@ const prevPage = () => {
   }
 };
 
+// Add a function to verify stream before playing
+const verifyStream = async (url) => {
+  try {
+    const response = await fetch(url, { method: 'HEAD', timeout: 5000 });
+    return response.ok;
+  } catch {
+    return false;
+  }
+};
+
 // Update the selectStation function
 const selectStation = async (station) => {
   try {
     isPlaybackLoading.value = true;
     error.value = null;
+
+    // Verify stream before attempting to play
+    const isStreamValid = await verifyStream(station.streamUrl);
+    if (!isStreamValid) {
+      throw new Error('Stream is not currently available');
+    }
     
     // Stop current stream if exists
     if (audioStream.value) {

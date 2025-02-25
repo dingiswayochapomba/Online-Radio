@@ -341,56 +341,52 @@ const malawiStations: Station[] = [
   }
 ]
 
-// Modify the fetchStations function to include Malawian stations
+// Add the Radio Browser API base URL
+const RADIO_BROWSER_API = 'https://de1.api.radio-browser.info/json/stations'
+
+// Modify the fetchStations function
 const fetchStations = async () => {
   try {
     error.value = null
     isLoading.value = true
     
     // First, add Malawian stations
-    stations.value = [...malawiStations]
+    const localStations = [...malawiStations]
     
-    // Then fetch additional stations from the API
-    const countries = ['za', 'ke', 'tz', 'ug', 'zm'] // Focusing on African stations
-    const randomCountry = countries[Math.floor(Math.random() * countries.length)]
-    
-    const response = await fetch(CORS_PROXY + encodeURIComponent(`https://onlineradiobox.com/json/${randomCountry}/`))
+    // Fetch gospel stations from Radio Browser API
+    const params = new URLSearchParams({
+      limit: '30',
+      offset: ((currentPage.value - 1) * stationsPerPage).toString(),
+      tagList: 'gospel',
+      hidebroken: 'true',
+      order: 'votes', // Sort by popularity
+      reverse: 'true'
+    })
+
+    const response = await fetch(`${RADIO_BROWSER_API}/search?${params}`)
     
     if (!response.ok) {
-      throw new Error('Failed to fetch additional radio stations')
+      throw new Error('Failed to fetch gospel radio stations')
     }
 
     const data = await response.json()
     
-    if (!data || typeof data !== 'object') {
-      throw new Error('Invalid response format from API')
-    }
+    // Map the Radio Browser stations to our Station interface
+    const gospelStations = data.map((station: any): Station => ({
+      id: station.stationuuid || String(Math.random()),
+      name: station.name || 'Unknown Station',
+      genre: station.tags || 'Gospel',
+      logo: station.favicon || station.url_resolved || placeholderImage,
+      listeners: station.clickcount || 0,
+      bitrate: station.bitrate || 128,
+      streamUrl: station.url_resolved || station.url,
+      country: station.country || 'Unknown',
+      codec: station.codec || 'MP3',
+      status: 'Online'
+    })).filter((station: Station) => station.streamUrl) // Filter out stations without stream URLs
 
-    const stationsData = data.stations || data.items || data.data || []
-    
-    if (!Array.isArray(stationsData)) {
-      throw new Error('No stations array found in response')
-    }
-    
-    // Filter and map additional stations
-    const additionalStations = stationsData
-      .filter((station: any) => station && station.stream && station.stream.trim() !== '')
-      .map((station: any): Station => ({
-        id: station.id || String(Math.random()),
-        name: station.name || 'Unknown Station',
-        genre: Array.isArray(station.genres) ? station.genres.join(', ') : station.genre || 'Various',
-        logo: station.logo || station.favicon || placeholderImage,
-        listeners: station.listeners || 0,
-        bitrate: parseInt(station.bitrate) || 128,
-        streamUrl: station.stream || '',
-        country: station.country || 'Unknown',
-        codec: station.codec || 'MP3',
-        status: station.status || 'Online'
-      }))
-      .slice(0, 10) // Limit to 10 additional stations
-
-    // Combine Malawian and additional stations
-    stations.value = [...stations.value, ...additionalStations]
+    // Combine local and fetched stations
+    stations.value = [...localStations, ...gospelStations]
     totalStations.value = stations.value.length
 
     // Apply pagination
@@ -400,7 +396,7 @@ const fetchStations = async () => {
 
   } catch (err: any) {
     console.error('Error fetching stations:', err)
-    error.value = err.message || 'Failed to load radio stations'
+    error.value = err.message || 'Failed to load gospel stations'
     // Still show Malawian stations even if API fails
     stations.value = malawiStations
     totalStations.value = malawiStations.length
@@ -409,8 +405,20 @@ const fetchStations = async () => {
   }
 }
 
-// Add a function to try alternative stream URLs if the main one fails
+// Update the tryAlternativeStream function to handle Radio Browser streams
 const tryAlternativeStream = async (station: Station) => {
+  // For Radio Browser stations, try the direct stream URL first
+  if (!station.id.includes('local_')) {
+    try {
+      const audio = new Audio(station.streamUrl)
+      await audio.play()
+      audio.pause()
+      return station.streamUrl
+    } catch (err) {
+      console.warn(`Failed to play stream: ${station.streamUrl}`, err)
+    }
+  }
+
   // Alternative stream URLs for Malawian stations
   const alternativeStreams: Record<string, string[]> = {
     'timveni': [
@@ -421,7 +429,7 @@ const tryAlternativeStream = async (station: Station) => {
       'https://stream.zeno.fm/6vw2gc5g0uhvv',
       'https://stream.radiojar.com/mijfm'
     ],
-    // Add alternative URLs for other stations...
+    // Add alternative URLs for other local stations...
   }
 
   const streams = alternativeStreams[station.id] || []
@@ -533,8 +541,10 @@ const handlePlayPause = async () => {
     } else {
       error.value = 'No audio stream available. Please select a station first'
     }
-  } catch (error) {
-    console.error('Play/Pause failed:', error)
+  } catch (err: unknown) {
+    // Type guard to handle the error properly
+    const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred'
+    console.error('Play/Pause failed:', errorMessage)
     error.value = 'Failed to control playback. Please try again.'
   }
 }
