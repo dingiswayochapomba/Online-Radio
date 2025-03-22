@@ -16,7 +16,7 @@
       <div class="flex justify-between items-center mb-6">
         <h2 class="text-xl font-semibold text-white flex items-center gap-2">
           <span class="w-2 h-2 bg-[#F6B17A] rounded-full"></span>
-          Top Jazz Radio Stations
+          Top Blues Radio Stations
         </h2>
         <button 
           @click="fetchStations" 
@@ -157,11 +157,11 @@ import AudioPlayer from '~/components/AudioPlayer.vue'
 
 // Add page metadata
 useHead({
-  title: 'Top Jazz Radio Stations - TuneRadio',
+  title: 'Top Blues Radio Stations - TuneRadio',
   meta: [
     {
       name: 'description',
-      content: 'Listen to top jazz radio stations from around the world'
+      content: 'Listen to top blues radio stations from around the world'
     }
   ]
 });
@@ -182,7 +182,7 @@ const placeholderImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB
 
 const { state, actions } = useAudioState()
 
-// Add computed properties to match index.vue
+// Add computed properties
 const isPlaying = computed(() => state.isPlaying)
 const volume = computed({
   get: () => state.volume,
@@ -196,7 +196,7 @@ const fetchStations = async () => {
     error.value = null;
     isLoading.value = true;
     
-    const response = await fetch('https://de1.api.radio-browser.info/json/stations/bytag/jazz?' + new URLSearchParams({
+    const response = await fetch('https://de1.api.radio-browser.info/json/stations/bytag/blues?' + new URLSearchParams({
       offset: ((currentPage.value - 1) * stationsPerPage).toString(),
       limit: stationsPerPage.toString(),
       hidebroken: 'true',
@@ -210,62 +210,106 @@ const fetchStations = async () => {
 
     const data = await response.json();
     
-    // Filter stations to ensure they have valid streams and exclude BBC Radio stations
+    // Filter stations to ensure they have valid streams
     const validStations = data.filter(station => 
       station.url_resolved &&
       station.url_resolved.trim() !== '' &&
-      station.lastcheckok === 1 &&
-      !station.name.includes('BBC Radio') // Exclude all BBC Radio stations
+      station.lastcheckok === 1
     );
     
     if (!validStations.length) {
-      throw new Error('No active jazz radio stations found');
+      throw new Error('No active blues radio stations found');
     }
 
-    // Add reliable jazz stations
-    const reliableJazzStations = [
+    // Add reliable blues stations
+    const reliableBluesStations = [
       {
-        id: 'jazz24-org',
-        name: 'Jazz24',
-        genre: 'Jazz',
-        logo: 'https://jazz24.org/wp-content/uploads/2019/07/jazz24-logo.png',
-        listeners: 2500,
+        id: 'delta-blues',
+        name: 'Delta Blues Radio',
+        genre: 'Delta Blues',
+        logo: 'https://www.radio.net/images/broadcasts/7f/65/31756/1/c300.png',
+        listeners: 2800,
         bitrate: 128,
-        streamUrl: 'https://live.wostreaming.net/direct/ppm-jazz24aac-ibc1',
+        streamUrl: 'https://radio.streemlion.com:4245/stream',
         mountPoint: '/stream',
-        codec: 'AAC',
+        codec: 'MP3',
         country: 'United States',
         votes: 0,
         lastChecked: new Date().toLocaleDateString(),
         status: 'Online'
       },
       {
-        id: 'tsfjazz-paris',
-        name: 'TSF Jazz',
-        genre: 'Jazz',
-        logo: 'https://www.tsfjazz.com/img/logo.png',
-        listeners: 2000,
+        id: 'chicago-blues',
+        name: 'Chicago Blues Experience',
+        genre: 'Chicago Blues',
+        logo: 'https://www.radio.net/images/broadcasts/08/a1/37665/1/c300.png',
+        listeners: 2600,
         bitrate: 128,
-        streamUrl: 'https://tsfjazz.ice.infomaniak.ch/tsfjazz-high.mp3',
+        streamUrl: 'https://streaming.radio.co/s5b9859404/listen',
         mountPoint: '/stream',
         codec: 'MP3',
-        country: 'France',
+        country: 'United States',
+        votes: 0,
+        lastChecked: new Date().toLocaleDateString(),
+        status: 'Online'
+      },
+      {
+        id: 'blues-radio-uk',
+        name: 'Blues Radio UK',
+        genre: 'Blues',
+        logo: 'https://www.radio.net/images/broadcasts/08/a1/37665/1/c300.png',
+        listeners: 2500,
+        bitrate: 128,
+        streamUrl: 'https://stream.zeno.fm/2xs37pha2mruv',
+        mountPoint: '/stream',
+        codec: 'MP3',
+        country: 'United Kingdom',
+        votes: 0,
+        lastChecked: new Date().toLocaleDateString(),
+        status: 'Online'
+      },
+      {
+        id: 'blues-cafe-radio',
+        name: 'Blues Café Radio',
+        genre: 'Blues',
+        logo: 'https://www.bluescaferadio.com/images/logo.jpg',
+        listeners: 2000,
+        bitrate: 128,
+        streamUrl: 'https://usa1.fastcast4u.com/proxy/bluescaferadio?mp=/1',
+        mountPoint: '/stream',
+        codec: 'MP3',
+        country: 'United States',
+        votes: 0,
+        lastChecked: new Date().toLocaleDateString(),
+        status: 'Online'
+      },
+      {
+        id: 'classic-blues-radio',
+        name: 'Classic Blues Radio',
+        genre: 'Classic Blues',
+        logo: 'https://www.radio.net/images/broadcasts/7f/65/31756/1/c300.png',
+        listeners: 1900,
+        bitrate: 128,
+        streamUrl: 'https://stream.zeno.fm/d739ftphfg8uv',
+        mountPoint: '/stream',
+        codec: 'MP3',
+        country: 'United States',
         votes: 0,
         lastChecked: new Date().toLocaleDateString(),
         status: 'Online'
       }
     ];
     
-    // Set total stations to fixed 30
+    // Set total stations
     totalStations.value = 30;
     
-    // Map stations and insert reliable jazz stations at the beginning
+    // Map stations and insert reliable blues stations at the beginning
     stations.value = [
-      ...reliableJazzStations,
+      ...reliableBluesStations,
       ...validStations.map(station => ({
         id: station.stationuuid,
         name: station.name,
-        genre: station.tags.split(',')[0] || 'Jazz',
+        genre: station.tags.split(',')[0] || 'Blues',
         logo: station.favicon || placeholderImage,
         listeners: station.clickcount || 0,
         bitrate: station.bitrate || 128,
@@ -280,13 +324,13 @@ const fetchStations = async () => {
     ];
   } catch (error) {
     console.error('Error fetching stations:', error);
-    error.value = error.message || 'Failed to load jazz radio stations';
+    error.value = error.message || 'Failed to load blues radio stations';
   } finally {
     isLoading.value = false;
   }
 };
 
-// Add pagination methods
+// Pagination methods
 const totalPages = computed(() => Math.ceil(totalStations.value / stationsPerPage));
 
 const goToPage = (page) => {
@@ -308,7 +352,6 @@ const prevPage = () => {
   }
 };
 
-// Update the selectStation function to match index.vue:
 const selectStation = async (station) => {
   try {
     error.value = null
@@ -328,7 +371,7 @@ const selectStation = async (station) => {
       format: station.codec,
       streamUrl: station.streamUrl,
       mimeType: 'audio/mpeg',
-      category: station.genre || 'Jazz'
+      category: station.genre || 'Blues'
     })
 
     actions.stopAudio()
@@ -351,7 +394,6 @@ const selectStation = async (station) => {
   }
 }
 
-// Add these methods to match index.vue:
 const handlePlayPause = () => {
   actions.handlePlayPause()
 }
@@ -369,7 +411,7 @@ onMounted(() => {
   fetchStations();
 });
 
-// Update cleanup
+// Cleanup
 onBeforeUnmount(() => {
   actions.stopAudio()
 });

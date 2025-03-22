@@ -2,6 +2,9 @@
 import { defineNuxtConfig } from 'nuxt/config'
 
 export default defineNuxtConfig({
+  nitro: {
+    preset: 'static',
+  },
   ssr: true,
   devtools: { enabled: false },
 
@@ -44,8 +47,5 @@ export default defineNuxtConfig({
 
   build: {
     transpile: ['@heroicons/vue']
-  },
-  nitro: {
-    preset: 'cloudflare-pages',
   }
 })

@@ -24,7 +24,7 @@ interface AudioActions {
   updateVolume: (value: number) => void
   toggleMute: () => void
   setTrack: (track: Track) => void
-  initializeAudio: (url: string) => Promise<void>
+  initializeAudio: (url: string) => Promise<boolean>
   stopAudio: () => void
 }
 
@@ -107,66 +107,52 @@ export function createAudioState() {
       actions.stopAudio()
     },
 
-    async initializeAudio(url: string) {
+    async initializeAudio(streamUrl: string): Promise<boolean> {
       try {
-        // Clear any existing timeout and audio
-        if (loadTimeout) clearTimeout(loadTimeout)
-        actions.stopAudio()
+        // Create new audio element if it doesn't exist
+        if (!state.audioStream) {
+          state.audioStream = new Audio()
+        }
 
-        // Create new audio instance with optimized settings
-        const audio = new Audio()
-        audio.crossOrigin = 'anonymous'
-        audio.volume = state.volume
-        audio.preload = 'auto'
-        
-        // Reduce buffering to start playback faster
-        audio.autobuffer = true
-        audio.autoplay = true // Try immediate autoplay
-        
-        const playPromise = new Promise((resolve, reject) => {
-          // Shorter timeout (3 seconds)
-          loadTimeout = setTimeout(() => {
-            reject(new Error('Stream loading timeout'))
-          }, 3000)
+        // Reset audio element
+        state.audioStream.src = ''
+        state.audioStream.load()
 
-          const cleanup = () => {
-            if (loadTimeout) {
-              clearTimeout(loadTimeout)
-              loadTimeout = null
-            }
-          }
+        // Set new source
+        state.audioStream.src = streamUrl
 
-          // Try to play as soon as we have enough data
-          audio.addEventListener('canplay', async () => {
-            try {
-              cleanup()
-              await audio.play()
-              state.isPlaying = true
-              resolve(true)
-            } catch (err) {
-              cleanup()
-              reject(err)
-            }
+        // Set volume and other properties
+        state.audioStream.volume = state.volume
+        state.audioStream.crossOrigin = 'anonymous'
+
+        // Return promise that resolves when audio can play
+        return new Promise((resolve) => {
+          const timeoutId = setTimeout(() => {
+            resolve(false)
+          }, 5000) // 5 second timeout
+
+          state.audioStream!.addEventListener('canplay', () => {
+            clearTimeout(timeoutId)
+            state.audioStream!.play()
+              .then(() => {
+                state.isPlaying = true
+                resolve(true)
+              })
+              .catch(() => resolve(false))
           }, { once: true })
 
-          audio.addEventListener('error', (e) => {
-            cleanup()
-            state.isPlaying = false
-            reject(new Error('Failed to play audio'))
+          state.audioStream!.addEventListener('error', () => {
+            clearTimeout(timeoutId)
+            resolve(false)
           }, { once: true })
+
+          // Start loading the audio
+          state.audioStream!.load()
         })
-
-        // Set source and immediately try to load
-        audio.src = url
-        state.audioStream = audio
-        audio.load() // Force immediate loading
-
-        // Wait for either play success or failure
-        await playPromise
-      } catch (error) {
-        console.error('Error initializing audio:', error)
+      } catch (err) {
+        console.error('Error initializing audio:', err)
         state.isPlaying = false
-        throw error
+        return false
       }
     },
 

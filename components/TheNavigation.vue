@@ -78,6 +78,7 @@ const navigationLinks = [
   { name: 'News', path: '/news_stations' },
   { name: 'Gospel', path: '/gospel_stations' },
   { name: 'Jazz', path: '/top_jazz' },
+  { name: 'Blues', path: '/blues' },
   { name: 'Malawi', path: '/malawi_stations' }
 ]
 </script> 

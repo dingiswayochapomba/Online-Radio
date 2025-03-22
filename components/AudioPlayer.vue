@@ -74,6 +74,13 @@
   <div class="h-24"></div>
 </template>
 
+<script lang="ts">
+// Default export definition
+export default {
+  name: 'AudioPlayer'
+}
+</script>
+
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useAudioState } from '~/composables/useAudioState'

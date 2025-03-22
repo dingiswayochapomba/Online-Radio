@@ -21,7 +21,7 @@
       <div class="flex justify-between items-center mb-6">
         <h2 class="text-xl font-semibold text-white flex items-center gap-2">
           <span class="w-2 h-2 bg-[#F6B17A] rounded-full"></span>
-          {{ currentStationId ? currentTrack.category || 'Now Playing' : 'Featured Stations' }}
+          {{ currentStationId ? (stations.find(s => s.id === currentStationId)?.category || 'Now Playing') : 'Featured Stations' }}
         </h2>
         <button 
           @click="fetchStations" 
@@ -66,7 +66,7 @@
                 :src="station.logo" 
                 :alt="station.name"
                 class="w-full h-full object-cover"
-                @error="e => e.target.src = placeholderImage"
+                @error="handleImageError"
               >
             </div>
             <div class="flex-1 min-w-0">
@@ -124,6 +124,36 @@
                   categoryLabel: 'Gospel'
                 },
                 {
+                  id: 'christian-fm-usa',
+                  name: 'Christian FM',
+                  genre: 'Christian Contemporary',
+                  logo: 'https://christianfm.com/kbm2023/wp-content/uploads/2023/11/cropped-apple-touch-icon-180x180.png',
+                  listeners: 2500,
+                  bitrate: 128,
+                  streamUrl: 'http://stream.dar.fm/27203',
+                  mountPoint: '/stream',
+                  codec: 'MP3',
+                  country: 'The United States Of America',
+                  lastChecked: new Date().toLocaleDateString(),
+                  categoryLabel: 'Gospel',
+                  homepage: 'https://www.christianfm.com/',
+                  language: 'English'
+                },
+                {
+                  id: 'gospel-fm-jamaica',
+                  name: 'Gospel FM Jamaica',
+                  genre: 'Gospel',
+                  logo: 'https://gospelfmjamaica.com/images/logo.png',
+                  listeners: 1800,
+                  bitrate: 128,
+                  streamUrl: 'https://stream.gospelfmjamaica.com/live',
+                  mountPoint: '/live',
+                  codec: 'MP3',
+                  country: 'Jamaica',
+                  lastChecked: new Date().toLocaleDateString(),
+                  categoryLabel: 'Gospel'
+                },
+                {
                   id: 'transworld-africa',
                   name: 'Transworld Radio Africa',
                   genre: 'Gospel',
@@ -168,7 +198,7 @@
                     :src="station.logo" 
                     :alt="station.name"
                     class="w-full h-full object-cover"
-                    @error="e => e.target.src = placeholderImage"
+                    @error="handleImageError"
                   >
                 </div>
                 <div class="flex-1 min-w-0">
@@ -232,6 +262,7 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useAudioState } from '~/composables/useAudioState'
 import AudioPlayer from '~/components/AudioPlayer.vue'
+import type { Ref } from 'vue'
 
 const { state, actions } = useAudioState()
 
@@ -258,6 +289,7 @@ const error = ref<string | null>(null)
 const isLoading = ref(false)
 const currentStationId = ref<string | null>(null)
 const featuredStations = ref<Station[]>([])
+const refreshInterval: Ref<ReturnType<typeof setTimeout> | null> = ref(null)
 
 // Base64 placeholder image
 const placeholderImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
@@ -266,6 +298,9 @@ const fetchStations = async () => {
   try {
     error.value = null
     
+    // Store the currently playing station ID if any
+    const currentlyPlayingId = currentStationId.value
+
     const response = await fetch('https://de1.api.radio-browser.info/json/stations/bycountry/malawi?' + new URLSearchParams({
       hidebroken: 'true',
       order: 'clickcount',
@@ -336,9 +371,23 @@ const fetchStations = async () => {
         country: 'Malawi',
         votes: station.votes,
         lastChecked: new Date(station.lastchecktime).toLocaleDateString(),
-        status: station.lastcheckok === 1 ? 'Online' : 'Offline'
+        status: station.lastcheckok === 1 ? 'Online' : 'Offline',
+        category: station.tags.split(',')[0] || 'Various',
+        categoryLabel: station.tags.split(',')[0] || 'Various'
       }))
     ]
+
+    // If a station was playing, find and update it if still available
+    if (currentlyPlayingId) {
+      const updatedCurrentStation = stations.value.find(s => s.id === currentlyPlayingId)
+      if (!updatedCurrentStation) {
+        // If the station is no longer available, stop playback
+        currentStationId.value = null
+        actions.stopAudio()
+        error.value = 'The current station is no longer available.'
+      }
+    }
+
   } catch (err: unknown) {
     console.error('Error fetching stations:', err)
     error.value = err instanceof Error ? err.message : 'Failed to load Malawi radio stations'
@@ -470,14 +519,20 @@ const fetchFeaturedStations = async () => {
 }
 
 const selectStation = async (station: Station) => {
-  if (currentStationId.value === station.id && state.isPlaying) {
-    // If clicking the same station that's playing, pause it
-    actions.handlePlayPause()
-    return
-  }
-
   try {
-    // Update track info
+    error.value = null
+
+    if (currentStationId.value === station.id && state.isPlaying) {
+      actions.handlePlayPause()
+      return
+    }
+
+    isLoading.value = true
+
+    // Keep the existing category if the station is already playing
+    const existingStation = stations.value.find(s => s.id === currentStationId.value)
+    const category = existingStation?.category || station.category || station.genre || 'Radio Station'
+
     actions.setTrack({
       title: station.name,
       artist: station.country,
@@ -486,33 +541,67 @@ const selectStation = async (station: Station) => {
       format: station.codec,
       streamUrl: station.streamUrl,
       mimeType: 'audio/mpeg',
-      category: station.genre || 'Radio Station'
+      category: category // Use preserved category
     })
 
-    // Initialize and play audio
-    await actions.initializeAudio(station.streamUrl)
+    actions.stopAudio()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    const success = await actions.initializeAudio(station.streamUrl)
+    if (!success) {
+      throw new Error('Failed to initialize audio stream')
+    }
+
     currentStationId.value = station.id
 
   } catch (err: unknown) {
     console.error('Error playing station:', err)
     error.value = 'Failed to play this station. Please try another one.'
     currentStationId.value = null
+    actions.stopAudio()
+  } finally {
+    isLoading.value = false
   }
 }
 
 // Fetch stations on component mount
 onMounted(async () => {
+  // Initial fetch
   await Promise.all([
     fetchStations(),
     fetchFeaturedStations()
   ])
   actions.updateVolume(1)
+
+  // Set up automatic refresh every 5 minutes (300000 ms)
+  refreshInterval.value = setInterval(async () => {
+    try {
+      await Promise.all([
+        fetchStations(),
+        fetchFeaturedStations()
+      ])
+    } catch (err) {
+      console.error('Auto-refresh failed:', err)
+    }
+  }, 300000)
 })
 
 // Cleanup on unmount
 onBeforeUnmount(() => {
   actions.stopAudio()
+  if (refreshInterval.value) {
+    clearInterval(refreshInterval.value)
+    refreshInterval.value = null
+  }
 })
+
+// Add proper type for the error event handler
+const handleImageError = (e: Event) => {
+  const target = e.target as HTMLImageElement
+  if (target) {
+    target.src = placeholderImage
+  }
+}
 </script>
 
 <style scoped>
